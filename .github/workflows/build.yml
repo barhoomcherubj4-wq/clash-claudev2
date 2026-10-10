@@ -1,1 +1,39 @@
-1fa56a5326b5c7515051610e425e8624c1971885
+name: Build APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Open the zip
+        run: |
+          z=""
+          for f in *; do
+            if [ -f "$f" ] && unzip -tq "$f" >/dev/null 2>&1; then z="$f"; fi
+          done
+          if [ -z "$z" ]; then
+            echo "::error::No zip file found in the main folder of the repo. Upload ClashClaude-v2 again."
+            ls -la
+            exit 1
+          fi
+          echo "Using $z"
+          unzip -qo "$z"
+          if [ ! -f ClashClaude/settings.gradle.kts ]; then
+            echo "::error::The zip opened but there is no ClashClaude folder inside it."
+            ls -la
+            exit 1
+          fi
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - run: cd ClashClaude && gradle assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClashClaude-apk
+          path: ClashClaude/app/build/outputs/apk/debug/app-debug.apk
